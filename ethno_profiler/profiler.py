@@ -18,16 +18,16 @@ DEFAULT_DIMENSIONS = {
     "Neural": "neuroprotective[Title/Abstract] OR brain[Title/Abstract] OR serotonin[Title/Abstract] OR GABA[Title/Abstract]",
 }
 
-# Classification thresholds
+# Heuristic bands for search-result counts; these are not evidence grades.
 THRESHOLDS = {
-    "Strong": 10,
-    "Moderate": 5,
-    "Weak": 1,
-    "None": 0,
+    "High count": 10,
+    "Medium count": 5,
+    "Low count": 1,
+    "No hits": 0,
 }
 
 class Profiler:
-    """PubMed-based ethnopharmacological literature profiler."""
+    """Exploratory PubMed publication-count profiler for ethnomedicine research."""
 
     def __init__(self, dimensions=None, delay=0.4):
         """
@@ -45,11 +45,10 @@ class Profiler:
             r = requests.get(self.base_url, params={
                 'db': 'pubmed', 'term': query, 'retmax': 1, 'retmode': 'json'
             }, timeout=30)
-            if r.status_code == 200:
-                return int(r.json().get('esearchresult', {}).get('count', 0))
-            return 0
-        except Exception:
-            return 0
+            r.raise_for_status()
+            return int(r.json().get('esearchresult', {}).get('count', 0))
+        except requests.RequestException:
+            raise
 
     def profile(self, ingredients):
         """
@@ -89,22 +88,22 @@ class Profiler:
 
     @staticmethod
     def classify(count):
-        """Classify a publication count into an evidence level."""
-        if count >= THRESHOLDS["Strong"]:
-            return "Strong"
-        elif count >= THRESHOLDS["Moderate"]:
-            return "Moderate"
-        elif count >= THRESHOLDS["Weak"]:
-            return "Weak"
-        return "None"
+        """Assign a simple publication-count band, not an evidence grade."""
+        if count >= THRESHOLDS["High count"]:
+            return "High count"
+        elif count >= THRESHOLDS["Medium count"]:
+            return "Medium count"
+        elif count >= THRESHOLDS["Low count"]:
+            return "Low count"
+        return "No hits"
 
-    def plot_heatmap(self, results, output_path="evidence_heatmap.tiff", dpi=300):
-        """Generate evidence-level heatmap."""
+    def plot_heatmap(self, results, output_path="publication_counts.tiff", dpi=300):
+        """Generate a heatmap of exploratory publication-count bands."""
         dims = results['dimensions']
         herbs = results['ingredients']
 
-        # Build numeric matrix (0=None, 1=Weak, 2=Moderate, 3=Strong)
-        level_map = {"None": 0, "Weak": 1, "Moderate": 2, "Strong": 3}
+        # Build a numeric matrix from count bands (0=no hits, 3=high count).
+        level_map = {"No hits": 0, "Low count": 1, "Medium count": 2, "High count": 3}
         matrix = []
         for row in results['raw_counts']:
             matrix.append([level_map[self.classify(row[d])] for d in dims])
@@ -126,7 +125,7 @@ class Profiler:
 
         ax.set_xlabel('Pharmacological Category', fontsize=7)
         ax.set_ylabel('Botanical Ingredient', fontsize=7)
-        ax.set_title('Evidence Level Matrix', fontsize=8)
+        ax.set_title('Publication-count bands', fontsize=8)
 
         plt.tight_layout()
         plt.savefig(output_path, dpi=dpi, bbox_inches='tight', format='tiff')
@@ -136,7 +135,7 @@ class Profiler:
     def print_report(self, results):
         """Print a text report of the profiling results."""
         dims = results['dimensions']
-        print("\nEvidence Level Matrix:")
+        print("\nPublication-count bands (not evidence grades):")
         header = f"{'Ingredient':20s}" + "".join(f"{d:>12s}" for d in dims)
         print(header)
         print("-" * len(header))
@@ -144,17 +143,17 @@ class Profiler:
             levels = "".join(f"{self.classify(row[d]):>12s}" for d in dims)
             print(f"{row['ingredient']:20s}{levels}")
 
-        print("\n\nResearch Gaps:")
+        print("\n\nQueries with few search hits (not evidence of no effect):")
         for row in results['raw_counts']:
             for d in dims:
                 c = row[d]
                 if c == 0:
-                    print(f"  ⚠️ {row['ingredient']}: 0 PubMed studies in '{d}'")
+                    print(f"  ⚠️ {row['ingredient']}: no hits for the current PubMed query in '{d}'")
                 elif c < 5:
-                    print(f"  🔶 {row['ingredient']}: only {c} studies in '{d}'")
+                    print(f"  🔶 {row['ingredient']}: {c} hits for the current PubMed query in '{d}'")
 
     def to_markdown(self, results):
-        """Generate a Markdown table of evidence levels."""
+        """Generate a Markdown table of publication-count bands."""
         dims = results['dimensions']
         lines = ["| Ingredient |" + "|".join(dims) + "|"]
         lines.append("|---" * (len(dims) + 1) + "|")

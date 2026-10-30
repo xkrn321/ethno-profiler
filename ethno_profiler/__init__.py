@@ -1,10 +1,4 @@
-"""
-ethno_profiler - Systematic ethnopharmacological literature profiling
-
-Searches PubMed for an herbal formula's ingredients across pharmacological
-dimensions and generates evidence-level matrices and heatmaps.
-
-Main class: Profiler
-"""
-
+"""Exploratory PubMed count profiling for ethnomedicine research."""
 from .profiler import Profiler, __version__
+
+__all__ = ["Profiler", "__version__"]

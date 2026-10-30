@@ -16,8 +16,8 @@ setup(
             "ethno-profiler=ethno_profiler.cli:main",
         ],
     },
-    author="Xu Kuran",
-    description="Systematic ethnopharmacological literature profiling for traditional herbal formulas",
+    author="许库兰·阿不都许库尔",
+    description="Exploratory PubMed publication-count profiling for ethnomedicine research",
     license="MIT",
     classifiers=[
         "Programming Language :: Python :: 3",
